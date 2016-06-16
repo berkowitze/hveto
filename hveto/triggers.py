@@ -51,10 +51,12 @@ COLUMNS = {
 }
 
 
-def get_triggers(channel, etg, segments, cache=None, snr=None, frange=None,
-                 columns=None, **kwargs):
+def get_triggers(channel, etg, segments, cache=None, snr=None, franges=None,
+                 excluderanges=None, columns=None, **kwargs):
     """Get triggers for the given channel
     """
+    franges = clean_range_list(franges)
+    excluderanges = clean_range_list(excluderanges)
     # get table from etg
     try:
         Table = TABLE[etg.lower()]
@@ -131,14 +133,25 @@ def get_triggers(channel, etg, segments, cache=None, snr=None, frange=None,
         names, data = zip(*addfields.items())
         recarray = recfunctions.rec_append_fields(recarray, names, data)
         recarray = recfunctions.rec_drop_fields(recarray, dropfields)
-
     # filter
     if snr is not None:
         recarray = recarray[recarray['snr'] >= snr]
-    if tablename.endswith('_burst') and frange is not None:
-        recarray = recarray[
-            (recarray['frequency'] >= frange[0]) &
-            (recarray['frequency'] < frange[1])]
+    if tablename.endswith('_burst') and franges is not None:
+        new_table = recarray[recarray['frequency'] < 0]
+        for ind_range in franges:
+            lower = ind_range[0]
+            upper = ind_range[1]
+            new_table = numpy.hstack((new_table, recarray[
+               (recarray['frequency'] >= lower) & 
+               (recarray['frequency'] < upper)]))
+        recarray = new_table.copy()
+    if tablename.endswith('_burst') and excluderanges is not None:
+        for ind_range in excluderanges:
+            lower = ind_range[0]
+            upper = ind_range[1]
+            recarray = recarray[
+                (recarray['frequency'] <= lower) |
+                (recarray['frequency'] > upper)]
     return recarray[columns]
 
 
@@ -212,3 +225,14 @@ def write_ascii(outfile, recarray, fmt='%s', columns=None, **kwargs):
     kwargs.setdefault('header', ' '.join(recarray.dtype.names))
     numpy.savetxt(outfile, recarray, fmt=fmt, **kwargs)
     return outfile
+
+def clean_range_list(range_list):
+    if range_list is not None:
+        return sorted(map(
+              lambda ind_range: [int(ind_range[0]), int(ind_range[1])], map(
+                  lambda ind_range2: ind_range2.replace('\n', '').split('-'),
+                 range_list.split('Range:')[1:])
+             ))
+    else:
+        return None
+

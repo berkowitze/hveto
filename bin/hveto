@@ -182,12 +182,18 @@ else:
 
 # load auxiliary channels
 auxetg = cp.get('auxiliary', 'trigger-generator')
-auxfreq = cp.getfloats('auxiliary', 'frequency-range')
+auxfreq = cp.get('auxiliary', 'frequency-ranges')
+try:
+    auxfreqexclude = cp.get('auxiliary', 'exclude-frequency-ranges')
+except config.configparser.NoOptionError:
+    auxfreqexclude = None
+
 try:
     auxchannels = cp.get('auxiliary', 'channels').strip('\n').split('\n')
 except config.configparser.NoOptionError:
     auxchannels = find_auxiliary_channels(auxetg, start, ifo=args.ifo,
-                                          cache=acache)
+                                          cache=acache,
+                                          excluderanges=auxexcluderanges)
 
 # load unsafe channels list
 _unsafe = cp.get('safety', 'unsafe-channels')
@@ -245,11 +251,15 @@ else:
 # load primary triggers
 petg = cp.get('primary', 'trigger-generator')
 psnr = cp.getfloat('primary', 'snr-threshold')
-pfreq = cp.getfloats('primary', 'frequency-range')
+pfreq = cp.get('primary', 'frequency-ranges')
+try:
+    pfreqexclude = cp.get('primary', 'exclude-frequency-ranges')
+except config.configparser.NoOptionError:
+    pfreqexclude = None
 ptrigfind = dict((key.split('-', 1)[1], val) for (key, val) in
                  cp.items('primary') if key.startswith('trigfind-'))
-primary = get_triggers(pchannel, petg, analysis.active, snr=psnr, frange=pfreq,
-                       cache=pcache, **ptrigfind)
+primary = get_triggers(pchannel, petg, analysis.active, snr=psnr, franges=pfreq,
+                       excluderanges=pfreqexclude, cache=pcache, **ptrigfind)
 
 if len(primary):
     logger.info("Read %d events for %s" % (len(primary), pchannel))
@@ -303,7 +313,8 @@ def _get_aux_triggers(channel):
     # get triggers
     try:
         trigs = get_triggers(channel, auxetg, analysis.active, snr=minsnr,
-                             frange=auxfreq, cache=auxcache)
+                             excluderanges=auxfreqexclude,
+                             franges=auxfreq, cache=auxcache)
     # catch error and continue
     except ValueError as e:
         warnings.warn('%s: %s' % (type(e).__name__, str(e)))
@@ -333,7 +344,11 @@ if args.nproc > 1:
 # map without multiprocessing
 else:
     results = map(_get_aux_triggers, auxchannels)
-
+biggest = sorted(map(
+    lambda result: [result[1].size, result[0]],
+    results))[-25:]
+biggest.reverse()
+print('BIGGEST: %s' % biggest)
 logger.info("All aux events loaded")
 
 auxiliary = dict(x for x in results if x is not None)
@@ -496,6 +511,8 @@ cum. deadtime :   %s""" % (
     segfile = os.path.join(segdir, '%s-HVETO_VETO_SEGS_ROUND_%d-%d-%d.txt' % (
         ifo, round.n, start, duration))
     write_ascii_segments(segfile, round.vetoes)
+    open('/home/elias.berkowitz/public_html/ordered.txt', 'w').write(
+        'BIGGEST:%s' % biggest)
     logger.debug("Round %d vetoes written to %s" % (round.n, segfile))
     segxml = os.path.join(segdir, '%s-HVETO_VETO_SEGS_ROUND_%d-%d-%d.xml' % (
         ifo, round.n, start, duration))
