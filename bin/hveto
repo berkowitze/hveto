@@ -102,6 +102,15 @@ pout = parser.add_argument_group('Output options')
 pout.add_argument('-o', '--output-directory', default=os.curdir,
                   help='path of output directory, default: %(default)s')
 
+pout.add_argument('-g', '--gw-frequency-ranges', default='Range:0-2400',
+                  help='ranges of main channel h(t) to include. Format: '
+                        '"Range:0-40;Range:60-200" '
+                        'Must be wrapped with quotation marks')
+
+pout.add_argument('-x', '--aux-frequency-ranges', default='Range:0-2400',
+                  help='ranges of all auxiliary channels to include.'
+                       'format is same as for --gw-frequency-ranges')
+
 args = parser.parse_args()
 
 ifo = args.ifo
@@ -109,6 +118,15 @@ start = args.gpsstart.seconds
 end = args.gpsend.seconds
 duration = end - start
 
+pfreq = map(
+    lambda r: r.replace('Range:', ''),
+    args.gw_frequency_ranges.split(';'))
+pfreq = map(lambda r: map(int, r.split('-')), pfreq)
+
+auxfreq = map(
+    lambda r: r.replace('Range:', ''),
+    args.aux_frequency_ranges.split(';'))
+auxfreq = map(lambda r: map(int, r.split('-')), auxfreq)
 logger.info("-- Welcome to Hveto --")
 logger.info("GPS start time: %d" % start)
 logger.info("GPS end time: %d" % end)
@@ -182,11 +200,6 @@ else:
 
 # load auxiliary channels
 auxetg = cp.get('auxiliary', 'trigger-generator')
-auxfreq = cp.get('auxiliary', 'frequency-ranges')
-try:
-    auxfreqexclude = cp.get('auxiliary', 'exclude-frequency-ranges')
-except config.configparser.NoOptionError:
-    auxfreqexclude = None
 
 try:
     auxchannels = cp.get('auxiliary', 'channels').strip('\n').split('\n')
@@ -251,15 +264,10 @@ else:
 # load primary triggers
 petg = cp.get('primary', 'trigger-generator')
 psnr = cp.getfloat('primary', 'snr-threshold')
-pfreq = cp.get('primary', 'frequency-ranges')
-try:
-    pfreqexclude = cp.get('primary', 'exclude-frequency-ranges')
-except config.configparser.NoOptionError:
-    pfreqexclude = None
 ptrigfind = dict((key.split('-', 1)[1], val) for (key, val) in
                  cp.items('primary') if key.startswith('trigfind-'))
 primary = get_triggers(pchannel, petg, analysis.active, snr=psnr, franges=pfreq,
-                       excluderanges=pfreqexclude, cache=pcache, **ptrigfind)
+                       excluderanges=None, cache=pcache, **ptrigfind)
 
 if len(primary):
     logger.info("Read %d events for %s" % (len(primary), pchannel))
@@ -313,7 +321,6 @@ def _get_aux_triggers(channel):
     # get triggers
     try:
         trigs = get_triggers(channel, auxetg, analysis.active, snr=minsnr,
-                             excluderanges=auxfreqexclude,
                              franges=auxfreq, cache=auxcache)
     # catch error and continue
     except ValueError as e:
@@ -348,7 +355,6 @@ biggest = sorted(map(
     lambda result: [result[1].size, result[0]],
     results))[-25:]
 biggest.reverse()
-print('BIGGEST: %s' % biggest)
 logger.info("All aux events loaded")
 
 auxiliary = dict(x for x in results if x is not None)

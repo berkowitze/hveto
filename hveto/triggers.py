@@ -55,8 +55,6 @@ def get_triggers(channel, etg, segments, cache=None, snr=None, franges=None,
                  excluderanges=None, columns=None, **kwargs):
     """Get triggers for the given channel
     """
-    franges = clean_range_list(franges)
-    excluderanges = clean_range_list(excluderanges)
     # get table from etg
     try:
         Table = TABLE[etg.lower()]
