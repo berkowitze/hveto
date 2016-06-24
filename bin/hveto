@@ -119,14 +119,12 @@ end = args.gpsend.seconds
 duration = end - start
 
 pfreq = map(
-    lambda r: r.replace('Range:', ''),
-    args.gw_frequency_ranges.split(';'))
-pfreq = map(lambda r: map(int, r.split('-')), pfreq)
-
+    lambda x: map(int, x.split('-')),
+    args.gw_frequency_ranges.split(';'))  
 auxfreq = map(
-    lambda r: r.replace('Range:', ''),
+    lambda x: map(int, x.split('-')),
     args.aux_frequency_ranges.split(';'))
-auxfreq = map(lambda r: map(int, r.split('-')), auxfreq)
+
 logger.info("-- Welcome to Hveto --")
 logger.info("GPS start time: %d" % start)
 logger.info("GPS end time: %d" % end)
@@ -266,6 +264,7 @@ petg = cp.get('primary', 'trigger-generator')
 psnr = cp.getfloat('primary', 'snr-threshold')
 ptrigfind = dict((key.split('-', 1)[1], val) for (key, val) in
                  cp.items('primary') if key.startswith('trigfind-'))
+logger.debug('Using primary channel frequency ranges: %s' % pfreq)
 primary = get_triggers(pchannel, petg, analysis.active, snr=psnr, franges=pfreq,
                        excluderanges=None, cache=pcache, **ptrigfind)
 
@@ -308,7 +307,8 @@ write_ascii_triggers(trigfile, primary, columns=columns, fmt='%f')
 
 # -- load auxiliary triggers --------------------------------------------------
 
-logger.info("Reading triggers for aux channels...")
+logger.info("Reading triggers for aux channels with frequency ranges: %s" % (
+    (auxfreq))
 counter = multiprocessing.Value('i', 0)
 
 def _get_aux_triggers(channel):
@@ -351,10 +351,8 @@ if args.nproc > 1:
 # map without multiprocessing
 else:
     results = map(_get_aux_triggers, auxchannels)
-biggest = sorted(map(
-    lambda result: [result[1].size, result[0]],
-    results))[-25:]
-biggest.reverse()
+
+
 logger.info("All aux events loaded")
 
 auxiliary = dict(x for x in results if x is not None)
@@ -517,8 +515,6 @@ cum. deadtime :   %s""" % (
     segfile = os.path.join(segdir, '%s-HVETO_VETO_SEGS_ROUND_%d-%d-%d.txt' % (
         ifo, round.n, start, duration))
     write_ascii_segments(segfile, round.vetoes)
-    open('/home/elias.berkowitz/public_html/ordered.txt', 'w').write(
-        'BIGGEST:%s' % biggest)
     logger.debug("Round %d vetoes written to %s" % (round.n, segfile))
     segxml = os.path.join(segdir, '%s-HVETO_VETO_SEGS_ROUND_%d-%d-%d.xml' % (
         ifo, round.n, start, duration))
