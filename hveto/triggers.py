@@ -224,13 +224,3 @@ def write_ascii(outfile, recarray, fmt='%s', columns=None, **kwargs):
     numpy.savetxt(outfile, recarray, fmt=fmt, **kwargs)
     return outfile
 
-def clean_range_list(range_list):
-    if range_list is not None:
-        return sorted(map(
-              lambda ind_range: [int(ind_range[0]), int(ind_range[1])], map(
-                  lambda ind_range2: ind_range2.replace('\n', '').split('-'),
-                 range_list.split('Range:')[1:])
-             ))
-    else:
-        return None
-

@@ -308,7 +308,7 @@ write_ascii_triggers(trigfile, primary, columns=columns, fmt='%f')
 # -- load auxiliary triggers --------------------------------------------------
 
 logger.info("Reading triggers for aux channels with frequency ranges: %s" % (
-    (auxfreq))
+    (auxfreq)))
 counter = multiprocessing.Value('i', 0)
 
 def _get_aux_triggers(channel):
