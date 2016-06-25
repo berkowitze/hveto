@@ -111,6 +111,15 @@ pout.add_argument('-x', '--aux-frequency-ranges', default='Range:0-2400',
                   help='ranges of all auxiliary channels to include.'
                        'format is same as for --gw-frequency-ranges')
 
+pout.add_argument('--gw-exclude', default=None,
+                  help='frequency ranges to exclude from h(t). '
+                       'Same ormat as -g and -x.')
+
+pout.add_argument('--aux-exclude', default=None,
+                  help='Frequency ranges to exclude from auxiliary channels. '
+                       'Same format as -g and -x')
+                  
+
 args = parser.parse_args()
 
 ifo = args.ifo
@@ -118,19 +127,37 @@ start = args.gpsstart.seconds
 end = args.gpsend.seconds
 duration = end - start
 
-pfreq = map(
-    lambda x: map(int, x.split('-')),
-    args.gw_frequency_ranges.split(';'))  
-auxfreq = map(
-    lambda x: map(int, x.split('-')),
-    args.aux_frequency_ranges.split(';'))
-
 logger.info("-- Welcome to Hveto --")
 logger.info("GPS start time: %d" % start)
 logger.info("GPS end time: %d" % end)
 logger.info("Interferometer: %s" % ifo)
 
 # -- initialisation -----------------------------------------------------------
+
+try:
+    pfreq = map(
+        lambda x: map(int, x.split('-')),
+        args.gw_frequency_ranges.split(';'))  
+    auxfreq = map(
+        lambda x: map(int, x.split('-')),
+        args.aux_frequency_ranges.split(';'))
+
+    pfreq_exclude = args.gw_exclude
+    auxfreq_exclude = args.aux_exclude
+
+    if pfreq_exclude is not None:
+        pfreq_exclude = map(
+            lambda x: map(int, x.split('-')),
+            pfreq_exclude.split(';'))
+
+    if auxfreq_exclude is not None:
+        auxfreq_exclude = map(
+            lambda x: map(int, x.split('-')),
+            auxfreq_exclude.split(';'))
+except Exception as e:
+    logger.critical(e)
+    logger.critical('Invalid frequency range argument format.')
+    sys.exit(0)
 
 # read configuration
 cp = config.HvetoConfigParser(ifo=args.ifo)
@@ -266,7 +293,7 @@ ptrigfind = dict((key.split('-', 1)[1], val) for (key, val) in
                  cp.items('primary') if key.startswith('trigfind-'))
 logger.debug('Using primary channel frequency ranges: %s' % pfreq)
 primary = get_triggers(pchannel, petg, analysis.active, snr=psnr, franges=pfreq,
-                       excluderanges=None, cache=pcache, **ptrigfind)
+                       excluderanges=pfreq_exclude, cache=pcache, **ptrigfind)
 
 if len(primary):
     logger.info("Read %d events for %s" % (len(primary), pchannel))
@@ -321,6 +348,7 @@ def _get_aux_triggers(channel):
     # get triggers
     try:
         trigs = get_triggers(channel, auxetg, analysis.active, snr=minsnr,
+                             excluderanges=auxfreq_exclude,
                              franges=auxfreq, cache=auxcache)
     # catch error and continue
     except ValueError as e:
