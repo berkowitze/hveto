@@ -19,12 +19,11 @@
 # """Check if a trigger was vetoed by a specified hveto run.
 # """
 
-
 import sys, json, argparse, os, logging
 from hveto import log
+from gwpy.segments import SegmentList
 
 # -- parse command line -------------------------------------------------------
-
 
 def abs_path(p):
     return os.path.abspath(os.path.expanduser(p))
@@ -33,7 +32,7 @@ parser = argparse.ArgumentParser(description=__doc__)
 
 parser.add_argument('-t', '--trigger-time', required=True,
                     help='The time of the trigger in GPS time')
-parser.add_argument('-d', '--directory', default='.', type=abs_path,
+parser.add_argument('-d', '--directory', required=True, type=abs_path,
                     help='path to hveto-generated folder containing '
                     'a summary-stats.json file')
 parser.add_argument('-v', '--verbose', help='Print more information',
@@ -46,32 +45,23 @@ args = parser.parse_args()
 
 logger = log.Logger('hveto-trace', level=args.loglevel)
 trigger_time = float(args.trigger_time)
-directory = args.directory
+directory = args.directory.rstrip('/')
+logger = log.Logger('hveto-trace', level=args.loglevel)
 logger.debug('Running in verbose mode')
 logger.debug('Search directory: %s' % directory)
-if directory[-1] != '/':
-    directory += '/'
 
 try:
-    segment_stats = json.load(open('%ssummary-stats.json' % directory))
+    segment_stats = json.load(open('%s/summary-stats.json' % directory))
 except IOError:
     logger.error("'summary-stats.json' was not found in the input directory")
     sys.exit(0)
-    
-round_list = segment_stats[u'rounds']
-veto_seg_file_list = []
-get_segments = lambda line: [float(line.split('\t')[1]), float(line.split('\t')[2])]
+
 for i, cround in enumerate(segment_stats['rounds']):
     seg_files = filter(
         lambda f_name: '.txt' in f_name, cround[u'files'][u'VETO_SEGS'])
     for f in seg_files:
-        lines = map(
-            lambda line: line.split('\t'),
-            open(os.path.join(directory, f)).read().split('\n'))[0:-1]
-        segment_list = map(
-            lambda line: [float(line[1]), float(line[2])],
-            lines)
-        for segment in segment_list:
+        segments = SegmentList.read(os.path.join(directory, f))
+        for segment in segments:
             if segment[0] <= trigger_time <= segment[1]:
                 logger.info('Signal was vetoed in round %d by segment %s'
                     % ((i + 1), segment))
