@@ -92,7 +92,7 @@ def find_trigger_files(channel, etg, segments, **kwargs):
     return cache.unique()
 
 def get_triggers(channel, etg, segments, cache=None, snr=None, franges=None,
-                 excluderanges=None, columns=None, **kwargs):
+                 excluderanges=None, columns=None, raw=False, **kwargs):
     """Get triggers for the given channel
     """
     # get table from etg
@@ -133,11 +133,22 @@ def get_triggers(channel, etg, segments, cache=None, snr=None, franges=None,
     # filter
     if snr is not None:
         recarray = recarray[recarray['snr'] >= snr]
-    if tablename.endswith('_burst') and frange is not None:
-        recarray = recarray[
-            (recarray['peak_frequency'] >= frange[0]) &
-            (recarray['peak_frequency'] < frange[1])]
-
+    if tablename.endswith('_burst') and franges is not None:
+        new_table = recarray[recarray['peak_frequency'] < 0]
+        for ind_range in franges:
+            lower = ind_range[0]
+            upper = ind_range[1]
+            new_table = numpy.hstack((new_table, recarray[
+               (recarray['peak_frequency'] >= lower) & 
+               (recarray['peak_frequency'] < upper)]))
+        recarray = new_table.copy()
+    if tablename.endswith('_burst') and excluderanges is not None:
+        for ind_range in excluderanges:
+            lower = ind_range[0]
+            upper = ind_range[1]
+            recarray = recarray[
+                (recarray['peak_frequency'] <= lower) |
+                (recarray['peak_frequency'] > upper)]
     # return basic table if 'raw'
     if raw:
         return recarray
@@ -189,13 +200,6 @@ def get_triggers(channel, etg, segments, cache=None, snr=None, franges=None,
                (recarray['frequency'] >= lower) & 
                (recarray['frequency'] < upper)]))
         recarray = new_table.copy()
-    if tablename.endswith('_burst') and excluderanges is not None:
-        for ind_range in excluderanges:
-            lower = ind_range[0]
-            upper = ind_range[1]
-            recarray = recarray[
-                (recarray['frequency'] <= lower) |
-                (recarray['frequency'] > upper)]
     return recarray[columns]
 
 

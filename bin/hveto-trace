@@ -42,20 +42,23 @@ parser.add_argument('-v', '--verbose', help='Print more information',
 pout = parser.add_argument_group('Output options')
 
 args = parser.parse_args()
-
-logger = log.Logger('hveto-trace', level=args.loglevel)
-trigger_time = float(args.trigger_time)
-directory = args.directory.rstrip('/')
+directory = args.directory
 logger = log.Logger('hveto-trace', level=args.loglevel)
 logger.debug('Running in verbose mode')
 logger.debug('Search directory: %s' % directory)
 
+trigger_time = float(args.trigger_time)
+if directory[-1] != '/':
+    directory += '/'
+
 try:
-    segment_stats = json.load(open('%s/summary-stats.json' % directory))
+    segment_stats = json.load(open('%ssummary-stats.json' % directory))
 except IOError:
     logger.error("'summary-stats.json' was not found in the input directory")
     sys.exit(0)
 
+format_segment = lambda index: float(line.split('\t')[index])
+get_segments = lambda line: [format_segment(1),format_segment(2)]
 for i, cround in enumerate(segment_stats['rounds']):
     seg_files = filter(
         lambda f_name: '.txt' in f_name, cround[u'files'][u'VETO_SEGS'])

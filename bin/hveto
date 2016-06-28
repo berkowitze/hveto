@@ -102,12 +102,12 @@ pout = parser.add_argument_group('Output options')
 pout.add_argument('-o', '--output-directory', default=os.curdir,
                   help='path of output directory, default: %(default)s')
 
-pout.add_argument('-g', '--gw-frequency-ranges', default='Range:0-2400',
+pout.add_argument('-g', '--gw-frequency-ranges', default='0-8000',
                   help='ranges of main channel h(t) to include. Format: '
                         '"Range:0-40;Range:60-200" '
                         'Must be wrapped with quotation marks')
 
-pout.add_argument('-x', '--aux-frequency-ranges', default='Range:0-2400',
+pout.add_argument('-x', '--aux-frequency-ranges', default='0-8000',
                   help='ranges of all auxiliary channels to include.'
                        'format is same as for --gw-frequency-ranges')
 

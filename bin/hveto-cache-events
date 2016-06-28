@@ -29,6 +29,7 @@ import argparse
 import os
 import warnings
 import multiprocessing
+import sys
 
 try:
     import configparser
@@ -101,6 +102,23 @@ pout = parser.add_argument_group('Output options')
 pout.add_argument('-o', '--output-directory', default=os.curdir,
                   help='path of output directory, default: %(default)s')
 
+pout.add_argument('-g', '--gw-frequency-ranges', default='0-8000',
+                  help='ranges of main channel h(t) to include. Format: '
+                        '"Range:0-40;Range:60-200" '
+                        'Must be wrapped with quotation marks')
+
+pout.add_argument('-x', '--aux-frequency-ranges', default='0-8000',
+                  help='ranges of all auxiliary channels to include.'
+                       'format is same as for --gw-frequency-ranges')
+
+pout.add_argument('--gw-exclude', default=None,
+                  help='frequency ranges to exclude from h(t). '
+                       'Same ormat as -g and -x.')
+
+pout.add_argument('--aux-exclude', default=None,
+                  help='Frequency ranges to exclude from auxiliary channels. '
+                       'Same format as -g and -x')
+                  
 args = parser.parse_args()
 
 ifo = args.ifo
@@ -114,6 +132,30 @@ logger.info("GPS end time: %d" % end)
 logger.info("Interferometer: %s" % ifo)
 
 # -- initialisation -----------------------------------------------------------
+try:
+    pfreq = map(
+        lambda x: map(int, x.split('-')),
+        args.gw_frequency_ranges.split(';'))  
+    auxfreq = map(
+        lambda x: map(int, x.split('-')),
+        args.aux_frequency_ranges.split(';'))
+
+    pfreq_exclude = args.gw_exclude
+    auxfreq_exclude = args.aux_exclude
+
+    if pfreq_exclude is not None:
+        pfreq_exclude = map(
+            lambda x: map(int, x.split('-')),
+            pfreq_exclude.split(';'))
+
+    if auxfreq_exclude is not None:
+        auxfreq_exclude = map(
+            lambda x: map(int, x.split('-')),
+            auxfreq_exclude.split(';'))
+except Exception as e:
+    logger.critical(e)
+    logger.critical('Invalid frequency range argument format.')
+    sys.exit(0)
 
 # read configuration
 cp = config.HvetoConfigParser(ifo=args.ifo)
@@ -170,6 +212,7 @@ def create_filename(channel):
 
 
 def read_and_cache_events(channel, etg, cache=None, trigfindkwargs={},
+                          franges=[[0,8000]], excluderanges=None,
                           **getkwargs):
     cfile = create_filename(channel)
     # read existing cached triggers and work out new segments to query
@@ -191,16 +234,18 @@ def read_and_cache_events(channel, etg, cache=None, trigfindkwargs={},
     # find new triggers
     try:
         trigs = get_triggers(channel, auxetg, new.active, cache=cache,
-                             raw=True, **getkwargs)
+                         franges=franges, excluderanges=excluderanges,
+                         raw=True, **getkwargs)
     # catch error and continue
     except ValueError as e:
         warnings.warn('%s: %s' % (type(e).__name__, str(e)))
     else:
         a = write_events(channel, trigs, new)
-        try:
-            return CacheEntry.from_T050017(a), trigs.size
-        except TypeError:  # None
-            return
+    try:
+        return CacheEntry.from_T050017(a), trigs.size
+    except TypeError as e:  # None
+        print('%s error: %s' % (channel, e))
+        return
 
 
 def write_events(channel, tab, segments):
@@ -256,7 +301,7 @@ else:
 
 # load auxiliary channels
 auxetg = cp.get('auxiliary', 'trigger-generator')
-auxfreq = cp.getfloats('auxiliary', 'frequency-range')
+# auxfreq = cp.getfloats('auxiliary', 'frequency-range')
 try:
     auxchannels = cp.get('auxiliary', 'channels').strip('\n').split('\n')
 except config.configparser.NoOptionError:
@@ -310,12 +355,11 @@ else:
 # get primary params
 petg = cp.get('primary', 'trigger-generator')
 psnr = cp.getfloat('primary', 'snr-threshold')
-pfreq = cp.getfloats('primary', 'frequency-range')
 ptrigfind = dict((key.split('-', 1)[1], val) for (key, val) in
                  cp.items('primary') if key.startswith('trigfind-'))
 
 # load primary triggers
-out = read_and_cache_events(pchannel, petg, snr=psnr, frange=pfreq,
+out = read_and_cache_events(pchannel, petg, snr=psnr, franges=pfreq,
                             cache=pcache, trigfindkwargs=ptrigfind)
 try:
     e, n = out
@@ -352,7 +396,8 @@ def read_and_write_aux_triggers(channel):
         desc = name.replace('-', '_')
         auxcache = acache.sieve(ifos=ifo, description='%s*' % desc)
     out = read_and_cache_events(channel, auxetg, cache=auxcache, snr=minsnr,
-                                frange=auxfreq)
+                                franges=auxfreq,
+                                exclude_ranges=auxfreq_exclude)
     try:
         e, n = out
     except TypeError:
