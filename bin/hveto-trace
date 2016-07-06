@@ -39,54 +39,39 @@ parser.add_argument('-v', '--verbose', help='Print more information',
                     action='store_const', dest='loglevel', const=logging.DEBUG,
                     default=logging.INFO)
 
-parser.add_argument('-i', '--iterate', action='store_true',
-                    help='Run hveto-trace on each folder '
-                         'in the inputted directory')
-
 pout = parser.add_argument_group('Output options')
 
 args = parser.parse_args()
-directory = args.directory.rstrip('/')
-trigger_time = float(args.trigger_time)
-
+directory = args.directory
 logger = log.Logger('hveto-trace', level=args.loglevel)
 logger.debug('Running in verbose mode')
 logger.debug('Search directory: %s' % directory)
 
-def trace(folder):
-    try:
-        segment_stats = json.load(open('%s/summary-stats.json' % folder))
-    except IOError:
-        logger.error(
-            "'summary-stats.json' not found in the directory '%s'" % folder)
-        return
+trigger_time = float(args.trigger_time)
+if directory[-1] != '/':
+    directory += '/'
 
-    for i, cround in enumerate(segment_stats['rounds']):
-        seg_files = filter(
-            lambda f_name: '.txt' in f_name, cround[u'files'][u'VETO_SEGS'])
-        for f in seg_files:
-            segments = SegmentList.read(os.path.join(folder, f))
-            for segment in segments:
-                if segment[0] <= trigger_time <= segment[1]:
-                    if args.iterate:
-                        logger.info('Signal was vetoed in subdirectory %s' %(
-                            folder))
-                    logger.info('Signal was vetoed in round %d by segment %s'
-                        % ((i + 1), segment))
-                    logger.debug('Winner: %s' % cround['name'])
-                    logger.debug('Significance: %s' % cround['significance'])
-                    logger.debug('SNR: %s' % cround['snr'])
-                    logger.debug('Window: %s' % cround['window'])
-                    return folder
-        if args.iterate:
-            logger.info(
-                "Signal was not vetoed in subdirectory '%s'\n" % folder)
-        return False
+try:
+    segment_stats = json.load(open('%ssummary-stats.json' % directory))
+except IOError:
+    logger.error("'summary-stats.json' was not found in the input directory")
+    sys.exit(0)
 
-if args.iterate:
-    folders = ['%s/%s' % (directory, f) for f in os.listdir(directory)
-        if f != 'static']
-    map(trace, folders)
-else:
-    trace(directory)
+format_segment = lambda index: float(line.split('\t')[index])
+get_segments = lambda line: [format_segment(1),format_segment(2)]
+for i, cround in enumerate(segment_stats['rounds']):
+    seg_files = filter(
+        lambda f_name: '.txt' in f_name, cround[u'files'][u'VETO_SEGS'])
+    for f in seg_files:
+        segments = SegmentList.read(os.path.join(directory, f))
+        for segment in segments:
+            if segment[0] <= trigger_time <= segment[1]:
+                logger.info('Signal was vetoed in round %d by segment %s'
+                    % ((i + 1), segment))
+                logger.debug('Winner: %s' % cround['name'])
+                logger.debug('Significance: %s' % cround['significance'])
+                logger.debug('SNR: %s' % cround['snr'])
+                logger.debug('Window: %s' % cround['window'])
+                sys.exit(0)
 
+logger.info('Signal was not vetoed.')    

@@ -91,6 +91,7 @@ def find_trigger_files(channel, etg, segments, **kwargs):
                 raise
     return cache.unique()
 
+
 def get_triggers(channel, etg, segments, cache=None, snr=None, frange=None,
                  columns=None, raw=False, **kwargs):
     """Get triggers for the given channel
