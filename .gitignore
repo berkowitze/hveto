@@ -1,0 +1,18 @@
+# unwanted file-types
+*.pyc
+/*.patch
+
+# build products
+/hveto/version.py
+/build/
+/dist/
+/hveto.egg-info
+/.eggs/
+
+# documentation products
+/docs/_build/
+/docs/api/
+
+# test products
+/.cache/
+/.coverage
