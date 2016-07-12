@@ -193,7 +193,14 @@ def init_page(ifo, start, end, css=[], script=[], **kwargs):
     page.div(class_='container')
     page.div(class_='page-header', role='banner')
     page.h1("%s HierarchicalVeto" % ifo)
-    page.h3("%d-%d" % (str(tconvert(start)), str(tconvert(end)))
+    page.h3("%s through %s" % (
+        str(tconvert(start))[:-3],
+        str(tconvert(end))[:-3]))
+    prettifier = lambda x: '-'.join(map(str, x))
+    pfreq = ' & '.join(map(prettifier, kwargs['pfreq'])) + ' Hz'
+    auxfreq = ' & '.join(map(prettifier, kwargs['auxfreq'])) + ' Hz'
+    page.h4("Primary frequency ranges: %s<br/>Auxiliary frequency ranges: %s" % (
+            pfreq, auxfreq))
     page.div.close()
     page.div.close()  # container
 
@@ -202,7 +209,7 @@ def init_page(ifo, start, end, css=[], script=[], **kwargs):
     return page
 
 
-def close_page(page, target, about=None, date=None):
+def close_page(page, target, about=None, date=None, **kwargs):
     """Close an HTML document with markup then write to disk
 
     This method writes the closing markup to complement the opening
@@ -250,8 +257,10 @@ def wrap_html(func):
         initargs = {
             'title': '%s Hveto | %d-%d' % (ifo, start, end),
             'base': os.path.curdir,
+            'pfreq': kwargs['pfreq'],
+            'auxfreq': kwargs['auxfreq']
         }
-        for key in ['title', 'base']:
+        for key in ['title', 'base', 'pfreq', 'auxfreq']:
             if key in kwargs:
                 initargs[key] = kwargs.pop(key)
         # find outdir
@@ -501,7 +510,8 @@ def write_config_html(filepath, format='ini'):
 
 def write_summary(
         rounds, plots=[], header='Summary', plotsperrow=4,
-        tableclass='table table-condensed table-hover table-responsive'):
+        tableclass='table table-condensed table-hover table-responsive',
+        **kwargs):
     """Write the Hveto analysis summary HTML
 
     Parameters
@@ -644,7 +654,7 @@ def write_round(round):
 # that for you.
 
 @wrap_html
-def write_hveto_page(rounds, plots):
+def write_hveto_page(rounds, plots, **kwargs):
     """Write the Hveto results to HTML
 
     Parameters
@@ -668,7 +678,7 @@ def write_hveto_page(rounds, plots):
         the path of the HTML written for this analysis
     """
     page = markup.page()
-    page.add(write_summary(rounds, plots))
+    page.add(write_summary(rounds, plots, **kwargs))
     page.h2('Round details')
     for r in rounds:
         page.add(write_round(r))

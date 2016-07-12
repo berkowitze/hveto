@@ -181,6 +181,8 @@ for d in [segdir, plotdir, trigdir]:
 htmlv = {
     'title': '%s Hveto | %d-%d' % (ifo, start, end),
     'config': None,
+    'pfreq': pfreq,
+    'auxfreq': auxfreq,
 }
 
 # get segments
@@ -783,7 +785,7 @@ with open('summary-stats.json', 'w') as f:
 logger.debug("Summary JSON written to %s" % f.name)
 
 # -- write HTML and finish
-index = html.write_hveto_page(ifo, start, end, rounds, plots,  **htmlv)
+index = html.write_hveto_page(ifo, start, end, rounds, plots, **htmlv)
 logger.debug("HTML written to %s" % index)
 logger.debug("Analysis completed in %d seconds" % (time.time() - jobstart))
 logger.info("-- Hveto complete --")
