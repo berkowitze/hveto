@@ -28,6 +28,8 @@ import subprocess
 from functools import wraps
 from getpass import getuser
 
+from gwpy.time import tconvert
+
 from glue import markup
 
 from _version import get_versions
@@ -191,7 +193,7 @@ def init_page(ifo, start, end, css=[], script=[], **kwargs):
     page.div(class_='container')
     page.div(class_='page-header', role='banner')
     page.h1("%s HierarchicalVeto" % ifo)
-    page.h3("%d-%d" % (start, end))
+    page.h3("%d-%d" % (str(tconvert(start)), str(tconvert(end)))
     page.div.close()
     page.div.close()  # container
 
